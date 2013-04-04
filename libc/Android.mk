@@ -383,7 +383,6 @@ libc_common_src_files += \
 	arch-arm/bionic/setjmp.S \
 	arch-arm/bionic/sigsetjmp.S \
 	arch-arm/bionic/strcpy.S \
-	arch-arm/bionic/strcmp.S \
 	arch-arm/bionic/syscall.S \
 	string/strncmp.c \
 	unistd/socketcalls.c
@@ -397,6 +396,9 @@ libc_common_src_files += string/memchr.c
 libc_common_src_files += arch-arm/bionic/strlen.c.arm
 endif
 
+#To set mcpu=cortex-a15 for krait it had to be identified as a15 thus will use the a15 memspy
+#Don't use it since krait optimized memcpy is faster and I don't build for a15 devices
+#
 # We have a special memcpy for A15 currently
 ifeq ($(TARGET_ARCH_VARIANT_CPU),cortex-a15)
 libc_common_src_files += arch-arm/bionic/memcpy-a15.S
@@ -414,6 +416,16 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
 	string/bcopy.c \
 	string/memmove.c.arm
 endif # ARCH_ARM_HAVE_NEON
+
+#Arch specific strcmp
+ifeq ($(TARGET_USE_KRAIT_BIONIC_OPTIMIZATION), true)
+
+ libc_common_src_files += \
+	arch-arm/bionic/strcmp-krait.S 
+ else  #a9
+ libc_common_src_files += \
+	arch-arm/bionic/strcmp-a9.S 
+endif
 
 # If the kernel supports kernel user helpers for gettimeofday, use
 # that instead.
