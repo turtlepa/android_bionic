@@ -185,7 +185,6 @@ libc_common_src_files := \
 	string/strcasecmp.c \
 	string/strcasestr.c \
 	string/strcat.c \
-	string/strchr.c \
 	string/strcoll.c \
 	string/strcspn.c \
 	string/strdup.c \
@@ -382,21 +381,13 @@ libc_common_src_files += \
 	arch-arm/bionic/memset.S \
 	arch-arm/bionic/setjmp.S \
 	arch-arm/bionic/sigsetjmp.S \
-	arch-arm/bionic/strcpy.S \
-	arch-arm/bionic/strcmp.S \
 	arch-arm/bionic/syscall.S \
 	string/strncmp.c \
 	unistd/socketcalls.c
 
-# String routines optimized for ARMv7
-ifeq ($(ARCH_ARM_HAVE_ARMV7A),true)
-libc_common_src_files += arch-arm/bionic/memchr.S
-libc_common_src_files += arch-arm/bionic/strlen-armv7.S
-else
-libc_common_src_files += string/memchr.c
-libc_common_src_files += arch-arm/bionic/strlen.c.arm
-endif
-
+#To set mcpu=cortex-a15 for krait it had to be identified as a15 thus will use the a15 memspy
+#Don't use it since krait optimized memcpy is faster and I don't build for a15 devices
+#
 # We have a special memcpy for A15 currently
 ifeq ($(TARGET_ARCH_VARIANT_CPU),cortex-a15)
 libc_common_src_files += arch-arm/bionic/memcpy-a15.S
@@ -406,7 +397,7 @@ endif
 
 # Check if we want a neonized version of memmove instead of the
 # current ARM version
-ifeq ($(ARCH_ARM_HAVE_NEON),true)
+ifeq ($(ARCH_ARM_HAVE_ARMV7A)-$(ARCH_ARM_HAVE_NEON),true-true)
  libc_common_src_files += \
 	arch-arm/bionic/memmove.S
  else # Other ARM
@@ -414,6 +405,16 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
 	string/bcopy.c \
 	string/memmove.c.arm
 endif # ARCH_ARM_HAVE_NEON
+
+#Arch specific strcmp
+ifeq ($(TARGET_USE_KRAIT_BIONIC_OPTIMIZATION), true)
+
+ libc_common_src_files += \
+	arch-arm/bionic/strcmp-krait.S 
+ else  #a9
+ libc_common_src_files += \
+	arch-arm/bionic/strcmp-a9.S 
+endif
 
 # If the kernel supports kernel user helpers for gettimeofday, use
 # that instead.
@@ -446,6 +447,37 @@ libc_arch_static_src_files := \
 
 libc_arch_dynamic_src_files := \
 	arch-arm/bionic/exidx_dynamic.c
+
+ifeq ($(ARCH_ARM_HAVE_ARMV7A),true)
+  ifneq ($(IS_ARMV7A_QCOM),true)
+  libc_common_src_files += \
+    arch-arm/bionic/memchr.S \
+    arch-arm/bionic/armv7/strchr.S \
+    arch-arm/bionic/armv7/strcpy.c \
+    arch-arm/bionic/armv7/strlen.S
+  endif
+else
+libc_common_src_files += \
+  string/memchr.c \
+  string/strchr.c \
+  arch-arm/bionic/strcpy.S \
+  arch-arm/bionic/strlen.c.arm
+endif
+
+# Don't use linaro string routines on QCOM chipsets
+ifeq ($(ARCH_ARM_HAVE_ARMV7A)-$(IS_ARMV7A_QCOM),true-true)
+libc_common_src_files += \
+  arch-arm/bionic/memchr.S \
+  string/strchr.c \
+  arch-arm/bionic/strcpy.S \
+  arch-arm/bionic/strlen.c.arm
+endif
+else # arm
+
+libc_common_src_files += \
+  string/memchr.c \
+  string/strchr.c
+
 endif # arm
 
 ifeq ($(TARGET_ARCH),x86)
@@ -593,8 +625,6 @@ ifeq ($(TARGET_ARCH),arm)
   ifeq ($(ARCH_ARM_USE_NON_NEON_MEMCPY),true)
     libc_common_cflags += -DARCH_ARM_USE_NON_NEON_MEMCPY
   endif
-
-
   ifeq ($(ARCH_ARM_HAVE_NEON_UNALIGNED_ACCESS),true)
     libc_common_cflags += -DNEON_UNALIGNED_ACCESS
   endif
@@ -938,7 +968,7 @@ include $(CLEAR_VARS)
 # Since this code is experimental it is disabled by default.
 # see libc/bionic/pthread_debug.c for details
 
-LOCAL_CFLAGS := $(libc_common_cflags) -DPTHREAD_DEBUG -DPTHREAD_DEBUG_ENABLED=0
+LOCAL_CFLAGS := $(libc_common_cflags)
 LOCAL_C_INCLUDES := $(libc_common_c_includes)
 
 LOCAL_SRC_FILES := \
@@ -946,7 +976,6 @@ LOCAL_SRC_FILES := \
 	$(libc_static_common_src_files) \
 	bionic/dlmalloc.c \
 	bionic/malloc_debug_common.cpp \
-	bionic/pthread_debug.c \
 	bionic/libc_init_dynamic.c
 
 ifeq ($(TARGET_ARCH),arm)
