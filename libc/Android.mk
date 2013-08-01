@@ -369,7 +369,6 @@ libc_common_src_files += \
 	string/strncpy.c \
 	bionic/strchr.cpp \
 	string/strrchr.c \
-	bionic/memchr.c \
 	bionic/memrchr.c \
 	string/index.c \
 	bionic/strnlen.c \
@@ -396,6 +395,13 @@ libc_static_common_src_files += \
     bionic/pthread.c.arm \
     bionic/pthread_create.cpp.arm \
     bionic/pthread_key.cpp.arm \
+
+# cortex-a9 without neon
+ifneq ($(TARGET_CPU_VARIANT),tegra2)
+    libc_common_src_files += \
+	bionic/memchr.c \
+
+endif # cortex-a9 without neon
 
 endif # arm
 
